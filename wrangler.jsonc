@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dashboard-apd",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-03-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // TODO: preencher com a conta Cloudflare do cliente antes do deploy real.
+  "account_id": "PENDENTE_CONTA_CLOUDFLARE_CLIENTE",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "apd-db",
+      // TODO: placeholder — rodar `wrangler d1 create apd-db` antes do deploy
+      // real e colar o database_id gerado aqui. Para dev local (`next dev` /
+      // `wrangler dev --local`) esse valor não precisa ser válido: o D1 roda
+      // emulado em SQLite local (.wrangler/state), sem tocar a Cloudflare.
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ],
+  "vars": {
+    "META_AD_ACCOUNT_ID": "act_865556772643777",
+    "LIDERHUB_BASE_URL": "https://api.liderhub.com.br/v1",
+    "LIDERHUB_AUTH_HEADER": "x-company-key"
+  },
+  "observability": { "enabled": true }
+}

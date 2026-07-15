@@ -1,0 +1,24 @@
+# Dependências
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Env / segredos
+.env
+.env.local
+.env.*.local
+
+# Wrangler / Cloudflare
+.wrangler/
+.dev.vars
+.open-next/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Diversos
+.DS_Store
+*.log
