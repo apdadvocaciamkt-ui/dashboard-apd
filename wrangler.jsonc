@@ -4,8 +4,7 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2025-03-01",
   "compatibility_flags": ["nodejs_compat"],
-  // TODO: preencher com a conta Cloudflare do cliente antes do deploy real.
-  "account_id": "PENDENTE_CONTA_CLOUDFLARE_CLIENTE",
+  "account_id": "cd587ed8a82f1d31f2910eb96201ed07",
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -14,11 +13,7 @@
     {
       "binding": "DB",
       "database_name": "apd-db",
-      // TODO: placeholder — rodar `wrangler d1 create apd-db` antes do deploy
-      // real e colar o database_id gerado aqui. Para dev local (`next dev` /
-      // `wrangler dev --local`) esse valor não precisa ser válido: o D1 roda
-      // emulado em SQLite local (.wrangler/state), sem tocar a Cloudflare.
-      "database_id": "00000000-0000-0000-0000-000000000000"
+      "database_id": "3d1bcef9-318f-4878-9bf4-5b8c4ea0edcf"
     }
   ],
   "vars": {
