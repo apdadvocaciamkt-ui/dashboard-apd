@@ -93,8 +93,6 @@ com investimento do Meta Ads e Google Ads.
 ## Dashboard — ✅ rodando em localhost com dados reais
 Next.js + Tailwind + Recharts + Wrangler/D1 (molde do Ceci), identidade visual
 "Amazônia" (verde-floresta + dourado). `npm run dev` → http://localhost:3000.
-D1 local em `.wrangler/state` (nada na nuvem; `wrangler.jsonc` com account_id
-placeholder de propósito até o deploy).
 
 Implementado em 2026-07-12 (herdando lógica validada do projeto da planilha):
 - Funil cumulativo de 5 etapas ("chegou pelo menos até aqui" — sempre afunila):
@@ -111,4 +109,23 @@ Implementado em 2026-07-12 (herdando lógica validada do projeto da planilha):
 - ⚠️ O dashboard NÃO envia CAPI (isso é papel do projeto da planilha/n8n).
 
 Pendências: nome do status `104a7ebc...` (conferir no Kanban), rotacionar
-tokens quando o dashboard assumir, deploy Cloudflare (depois do GitHub).
+tokens quando o dashboard assumir.
+
+## GitHub + Cloudflare do cliente — 🟡 infra pronta, faltam segredos + confirmar Git
+
+- **GitHub**: código no repositório do cliente,
+  `apdadvocaciamkt-ui/dashboard-apd` (branch `main`), usuário como colaborador
+  com push. Repo público (decisão consciente do usuário — sem token real
+  commitado, `.env.local`/`.dev.vars` seguem fora do Git).
+- **Cloudflare**: usuário tem acesso de Super Admin na conta do cliente
+  (`Apd.advocacia.mkt@gmail.com's Account`, id `cd587ed8a82f1d31f2910eb96201ed07`).
+  Banco D1 real criado (`apd-db`, id `3d1bcef9-318f-4878-9bf4-5b8c4ea0edcf`) e
+  schema aplicado remotamente (6 tabelas). `wrangler.jsonc` já com os IDs reais,
+  commitado.
+- **Conexão Git↔Cloudflare**: usuário está configurando; ainda não confirmado
+  se está disparando build (checagem via GitHub API bloqueada por permissão —
+  só o dono `apdadvocaciamkt-ui` consegue ver isso).
+- **Pendente antes do primeiro deploy real**: configurar os segredos
+  (`wrangler secret put META_ACCESS_TOKEN`, etc.) — ainda não feito, precisa
+  do token da Cloudflare (não guardado em arquivo nenhum do projeto, só usado
+  em sessão).
