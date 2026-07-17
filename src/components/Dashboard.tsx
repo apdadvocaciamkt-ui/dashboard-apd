@@ -261,6 +261,15 @@ function CloseIcon() {
     </svg>
   );
 }
+function GripIcon() {
+  return (
+    <svg width="10" height="14" viewBox="0 0 10 16" fill="currentColor">
+      <circle cx="2" cy="2" r="1.3" /><circle cx="8" cy="2" r="1.3" />
+      <circle cx="2" cy="8" r="1.3" /><circle cx="8" cy="8" r="1.3" />
+      <circle cx="2" cy="14" r="1.3" /><circle cx="8" cy="14" r="1.3" />
+    </svg>
+  );
+}
 
 // Menu de escolha de métrica — só oferece as que ainda não estão em uso em
 // outro card (evita duplicar a mesma métrica duas vezes na fileira).
@@ -283,20 +292,35 @@ function MetricPicker({ options, onPick, onClose }: { options: typeof METRIC_CAT
   );
 }
 
-// Card de KPI editável: lápis troca a métrica exibida, × remove o card.
+// Card de KPI editável: lápis troca a métrica, × remove, segurar e arrastar
+// reordena (empurra os outros cards em tempo real, ao passar por cima deles).
 function EditableKpi({
   metricKey, totals, usedKeys, onChange, onRemove, canRemove, open, onToggle,
+  isDragging, onDragStart, onDragOver, onDragEnd,
 }: {
   metricKey: MetricKey; totals: InsightsResponse["totals"]; usedKeys: MetricKey[];
   onChange: (k: MetricKey) => void; onRemove: () => void; canRemove: boolean;
   open: boolean; onToggle: () => void;
+  isDragging: boolean; onDragStart: () => void; onDragOver: () => void; onDragEnd: () => void;
 }) {
   const def = METRIC_CATALOG.find((m) => m.key === metricKey)!;
   const options = METRIC_CATALOG.filter((m) => m.key === metricKey || !usedKeys.includes(m.key));
   return (
-    <div className="relative rounded-xl border border-brand-border bg-brand-surface p-4">
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", metricKey); onDragStart(); }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(); }}
+      onDrop={(e) => e.preventDefault()}
+      onDragEnd={onDragEnd}
+      className={`relative rounded-xl border border-brand-border bg-brand-surface p-4 transition-opacity ${isDragging ? "opacity-40" : ""}`}
+    >
       <div className="mb-2 flex items-center justify-between gap-1">
-        <span className="text-[11px] uppercase tracking-wide text-brand-muted">{def.label}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-[11px] uppercase tracking-wide text-brand-muted">
+          <span className="cursor-grab text-brand-muted/50 active:cursor-grabbing" title="Arraste para reordenar">
+            <GripIcon />
+          </span>
+          <span className="truncate">{def.label}</span>
+        </span>
         <span className="flex shrink-0 items-center gap-1">
           <button onClick={onToggle} title="Trocar métrica" className="rounded p-0.5 text-brand-muted transition-colors hover:text-brand-accent">
             <PencilIcon />
@@ -498,6 +522,7 @@ export default function Dashboard() {
   const [metricKeys, setMetricKeys] = useState<MetricKey[]>(DEFAULT_METRICS);
   const [presets, setPresets] = useState<MetricPreset[]>([]);
   const [openPicker, setOpenPicker] = useState<number | "add" | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -524,6 +549,16 @@ export default function Dashboard() {
   const changeMetric = (index: number, key: MetricKey) => setMetricKeys((prev) => prev.map((k, i) => (i === index ? key : k)));
   const removeMetric = (index: number) => setMetricKeys((prev) => prev.filter((_, i) => i !== index));
   const addMetric = (key: MetricKey) => setMetricKeys((prev) => [...prev, key]);
+  const reorderMetric = (from: number, to: number) => {
+    if (from === to) return;
+    setMetricKeys((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDragIndex(to);
+  };
   const loadPreset = (p: MetricPreset) => setMetricKeys(p.metrics);
   const savePreset = (name: string) => {
     setPresets((prev) => {
@@ -705,6 +740,10 @@ export default function Dashboard() {
                     canRemove={metricKeys.length > 1}
                     open={openPicker === i}
                     onToggle={() => setOpenPicker(openPicker === i ? null : i)}
+                    isDragging={dragIndex === i}
+                    onDragStart={() => setDragIndex(i)}
+                    onDragOver={() => { if (dragIndex !== null && dragIndex !== i) reorderMetric(dragIndex, i); }}
+                    onDragEnd={() => setDragIndex(null)}
                   />
                 ))}
                 <AddMetricCard
