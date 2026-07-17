@@ -11,9 +11,11 @@ type ObjectiveSummary = {
   impressions: number; clicks: number; linkClicks: number;
   ctr: number; cpc: number; cpm: number;
 };
+type TreeAd = { id: string; name: string; status: string; spend: number; result: number; costPerResult: number };
+type TreeAdSet = { id: string; name: string; status: string; spend: number; result: number; costPerResult: number; ads: TreeAd[] };
 type TreeCampaign = {
   id: string; name: string; objectiveKey: string; resultLabel: string; status: string;
-  spend: number; result: number; costPerResult: number;
+  spend: number; result: number; costPerResult: number; adsets: TreeAdSet[];
 };
 type InsightsResponse = {
   account: string; updatedAt: string;
@@ -225,6 +227,109 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
+function StatusDot({ status }: { status: string }) {
+  const active = status === "active";
+  return (
+    <span
+      title={active ? "Ativo" : "Inativo"}
+      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${active ? "bg-brand-accent" : "bg-brand-muted/50"}`}
+    />
+  );
+}
+
+// Árvore Campanha ▸ Conjunto de anúncios ▸ Anúncio, com expandir/recolher por
+// clique. Só campanhas/conjuntos com filhos ficam clicáveis.
+function CampaignTree({ campaigns, resultLabel }: { campaigns: TreeCampaign[]; resultLabel: string }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  const cols = "1fr 110px 90px 110px";
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="min-w-[560px]">
+        <div
+          className="grid items-center gap-3 border-b border-brand-border pb-2 text-[10px] font-bold uppercase tracking-wide text-brand-muted"
+          style={{ gridTemplateColumns: cols }}
+        >
+          <span>Campanha</span>
+          <span className="text-right">Investimento</span>
+          <span className="text-right">{resultLabel}</span>
+          <span className="text-right">Custo/result.</span>
+        </div>
+
+        {campaigns.map((c) => {
+          const cKey = `c:${c.id}`;
+          const cHas = c.adsets.length > 0;
+          const cOpen = cHas && open.has(cKey);
+          return (
+            <div key={c.id}>
+              <div
+                onClick={cHas ? () => toggle(cKey) : undefined}
+                role={cHas ? "button" : undefined}
+                tabIndex={cHas ? 0 : undefined}
+                className={`grid items-center gap-3 border-b border-brand-border py-2.5 transition-colors ${cHas ? "cursor-pointer hover:bg-brand-surface2" : ""}`}
+                style={{ gridTemplateColumns: cols }}
+              >
+                <span className="flex min-w-0 items-center gap-2 text-xs text-brand-text">
+                  <span className="w-3 shrink-0 text-brand-muted">{cHas ? (cOpen ? "▾" : "▸") : ""}</span>
+                  <StatusDot status={c.status} />
+                  <span className="truncate font-medium">{c.name}</span>
+                </span>
+                <span className="text-right text-xs tabular-nums text-brand-text">{fmtMoney(c.spend)}</span>
+                <span className="text-right text-xs tabular-nums text-brand-text">{fmtNum(c.result)}</span>
+                <span className="text-right text-xs tabular-nums text-brand-text">{fmtMoney(c.costPerResult)}</span>
+              </div>
+
+              {cOpen && c.adsets.map((s) => {
+                const sKey = `s:${s.id}`;
+                const sHas = s.ads.length > 0;
+                const sOpen = sHas && open.has(sKey);
+                return (
+                  <div key={s.id}>
+                    <div
+                      onClick={sHas ? () => toggle(sKey) : undefined}
+                      role={sHas ? "button" : undefined}
+                      tabIndex={sHas ? 0 : undefined}
+                      className={`grid items-center gap-3 border-b border-brand-border bg-brand-surface2/40 py-2 transition-colors ${sHas ? "cursor-pointer hover:bg-brand-surface2" : ""}`}
+                      style={{ gridTemplateColumns: cols }}
+                    >
+                      <span className="flex min-w-0 items-center gap-2 pl-5 text-xs text-brand-muted">
+                        <span className="w-3 shrink-0">{sHas ? (sOpen ? "▾" : "▸") : ""}</span>
+                        <StatusDot status={s.status} />
+                        <span className="truncate">{s.name}</span>
+                      </span>
+                      <span className="text-right text-xs tabular-nums text-brand-muted">{fmtMoney(s.spend)}</span>
+                      <span className="text-right text-xs tabular-nums text-brand-muted">{fmtNum(s.result)}</span>
+                      <span className="text-right text-xs tabular-nums text-brand-muted">{fmtMoney(s.costPerResult)}</span>
+                    </div>
+
+                    {sOpen && s.ads.map((a) => (
+                      <div key={a.id} className="grid items-center gap-3 border-b border-brand-border py-1.5" style={{ gridTemplateColumns: cols }}>
+                        <span className="flex min-w-0 items-center gap-2 pl-10 text-[11px] text-brand-muted">
+                          <StatusDot status={a.status} />
+                          <span className="truncate">{a.name}</span>
+                        </span>
+                        <span className="text-right text-[11px] tabular-nums text-brand-muted">{fmtMoney(a.spend)}</span>
+                        <span className="text-right text-[11px] tabular-nums text-brand-muted">{fmtNum(a.result)}</span>
+                        <span className="text-right text-[11px] tabular-nums text-brand-muted">{fmtMoney(a.costPerResult)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════ */
@@ -406,28 +511,7 @@ export default function Dashboard() {
                 {!insights || insights.tree.length === 0 ? (
                   <p className="text-xs text-brand-muted">Nenhuma campanha com veiculação neste período (rode o sync ou aguarde dados).</p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] uppercase tracking-wide text-brand-muted">
-                          <th className="pb-2">Campanha</th>
-                          <th className="pb-2 text-right">Investimento</th>
-                          <th className="pb-2 text-right">{insights.objectives[0]?.resultLabel ?? "Resultado"}</th>
-                          <th className="pb-2 text-right">Custo/result.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {insights.tree.map((c) => (
-                          <tr key={c.id} className="border-t border-brand-border">
-                            <td className="py-2 text-brand-text">{c.name}</td>
-                            <td className="py-2 text-right tabular-nums text-brand-text">{fmtMoney(c.spend)}</td>
-                            <td className="py-2 text-right tabular-nums text-brand-text">{fmtNum(c.result)}</td>
-                            <td className="py-2 text-right tabular-nums text-brand-text">{fmtMoney(c.costPerResult)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <CampaignTree campaigns={insights.tree} resultLabel={insights.objectives[0]?.resultLabel ?? "Resultado"} />
                 )}
               </Panel>
             </div>
