@@ -134,7 +134,10 @@ tokens quando o dashboard assumir.
   `/api/insights` com R$ 1.178 de spend/35d; funil 306 → 76 → 46 → 17 → **2
   contratos assinados** (subiu de 1!); Google Ads respondendo "pendente"
   corretamente.
-- **Sync ainda é manual** (chamar `/api/sync/meta?secret=...` e
-  `/api/sync/liderhub?secret=...`). Próximo passo natural: cron
-  (Worker `triggers.crons` ou cron externo) para rodar 1x/dia, como o
-  projeto Ceci faz com `cron/worker.js`.
+- **Cron automático configurado** (2026-07-17, mesmo padrão do Ceci): Worker
+  separado `dashboard-apd-cron` (`cron/worker.js` + `cron/wrangler.jsonc`),
+  agendado para **03h15 UTC (00h15 BRT)** todo dia — sincroniza o dia anterior
+  já fechado (Meta + LiderHub + Google Ads) via `fetch()` nas rotas de sync.
+  Confirmado registrado na Cloudflare via API (`GET .../schedules`).
+  ⚠️ Nota: "hoje" no dashboard normalmente vem vazio/incompleto — Meta Ads
+  atrasa horas pra consolidar o dia corrente. É esperado, não é bug.

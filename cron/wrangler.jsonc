@@ -1,0 +1,11 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "dashboard-apd-cron",
+  "main": "worker.js",
+  "compatibility_date": "2025-03-01",
+  "account_id": "cd587ed8a82f1d31f2910eb96201ed07",
+  "triggers": {
+    // 03h15 UTC = 00h15 BRT (UTC-3)
+    "crons": ["15 3 * * *"]
+  }
+}
