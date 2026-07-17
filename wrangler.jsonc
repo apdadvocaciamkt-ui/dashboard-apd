@@ -19,7 +19,9 @@
   "vars": {
     "META_AD_ACCOUNT_ID": "act_865556772643777",
     "LIDERHUB_BASE_URL": "https://api.liderhub.com.br/v1",
-    "LIDERHUB_AUTH_HEADER": "x-company-key"
+    "LIDERHUB_AUTH_HEADER": "x-company-key",
+    // ID da MCC (nao e segredo; segredos vao via `wrangler secret put`)
+    "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "6814043713"
   },
   "observability": { "enabled": true }
 }

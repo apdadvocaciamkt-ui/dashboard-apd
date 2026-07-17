@@ -111,21 +111,30 @@ Implementado em 2026-07-12 (herdando lógica validada do projeto da planilha):
 Pendências: nome do status `104a7ebc...` (conferir no Kanban), rotacionar
 tokens quando o dashboard assumir.
 
-## GitHub + Cloudflare do cliente — 🟡 infra pronta, faltam segredos + confirmar Git
+## Produção — ✅ NO AR (deploy 2026-07-16, validado ponta a ponta)
+
+**URL**: https://dashboard-apd.apd-advocacia-mkt.workers.dev
 
 - **GitHub**: código no repositório do cliente,
   `apdadvocaciamkt-ui/dashboard-apd` (branch `main`), usuário como colaborador
   com push. Repo público (decisão consciente do usuário — sem token real
   commitado, `.env.local`/`.dev.vars` seguem fora do Git).
-- **Cloudflare**: usuário tem acesso de Super Admin na conta do cliente
-  (`Apd.advocacia.mkt@gmail.com's Account`, id `cd587ed8a82f1d31f2910eb96201ed07`).
-  Banco D1 real criado (`apd-db`, id `3d1bcef9-318f-4878-9bf4-5b8c4ea0edcf`) e
-  schema aplicado remotamente (6 tabelas). `wrangler.jsonc` já com os IDs reais,
-  commitado.
-- **Conexão Git↔Cloudflare**: usuário está configurando; ainda não confirmado
-  se está disparando build (checagem via GitHub API bloqueada por permissão —
-  só o dono `apdadvocaciamkt-ui` consegue ver isso).
-- **Pendente antes do primeiro deploy real**: configurar os segredos
-  (`wrangler secret put META_ACCESS_TOKEN`, etc.) — ainda não feito, precisa
-  do token da Cloudflare (não guardado em arquivo nenhum do projeto, só usado
-  em sessão).
+- **Cloudflare** (conta do cliente, id `cd587ed8a82f1d31f2910eb96201ed07`):
+  Worker `dashboard-apd` deployado via `npm run cf:deploy` (wrangler direto;
+  a conexão Git↔Cloudflare que o usuário estava configurando é opcional agora).
+  D1 real `apd-db` (id `3d1bcef9-318f-4878-9bf4-5b8c4ea0edcf`) com schema
+  aplicado e dados sincronizados.
+- **Segredos em produção** (via `wrangler secret put`, 2026-07-16):
+  `META_ACCESS_TOKEN`, `LIDERHUB_TOKEN_APD`, `SYNC_SECRET`,
+  `GOOGLE_ADS_DEVELOPER_TOKEN`, `GOOGLE_ADS_CLIENT_ID`,
+  `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`.
+  O `SYNC_SECRET` de produção é o mesmo do `.env.local` local.
+- **Validação em produção (2026-07-16)**: página HTTP 200; sync Meta ok
+  (166 linhas diárias, 42 entidades); sync LiderHub ok (337 contatos);
+  `/api/insights` com R$ 1.178 de spend/35d; funil 306 → 76 → 46 → 17 → **2
+  contratos assinados** (subiu de 1!); Google Ads respondendo "pendente"
+  corretamente.
+- **Sync ainda é manual** (chamar `/api/sync/meta?secret=...` e
+  `/api/sync/liderhub?secret=...`). Próximo passo natural: cron
+  (Worker `triggers.crons` ou cron externo) para rodar 1x/dia, como o
+  projeto Ceci faz com `cron/worker.js`.
