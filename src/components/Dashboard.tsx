@@ -45,6 +45,10 @@ type GoogleAdsResponse =
 type Period = { type: "today" | "this_month" | "last_month" | "last_7d" | "last_30d" | "custom"; since: string; until: string };
 type View = "resumo" | "meta" | "google" | "liderhub";
 
+/* ── editor de métricas (Meta Ads) — salvo no navegador da pessoa (localStorage) ── */
+type MetricKey = "spend" | "impressions" | "clicks" | "link_clicks" | "ctr" | "cpc" | "cpm";
+type MetricPreset = { id: string; name: string; metrics: MetricKey[] };
+
 /* ── formatadores ── */
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numFmt = new Intl.NumberFormat("pt-BR");
@@ -54,6 +58,20 @@ const fmtDateBR = (iso: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(i
 const fmtDayMonth = (iso: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return m ? `${m[3]}/${m[2]}` : iso; };
 const syncTimeFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 const fmtSyncTime = (unixSeconds: number) => syncTimeFmt.format(new Date(unixSeconds * 1000)).replace(",", " às");
+
+const EMPTY_TOTALS: InsightsResponse["totals"] = { spend: 0, impressions: 0, clicks: 0, link_clicks: 0, ctr: 0, cpc: 0, cpm: 0 };
+const METRIC_CATALOG: { key: MetricKey; label: string; format: (t: InsightsResponse["totals"]) => string }[] = [
+  { key: "spend", label: "Investimento", format: (t) => fmtMoney(t.spend) },
+  { key: "impressions", label: "Impressões", format: (t) => fmtNum(t.impressions) },
+  { key: "clicks", label: "Cliques", format: (t) => fmtNum(t.clicks) },
+  { key: "link_clicks", label: "Cliques no link", format: (t) => fmtNum(t.link_clicks) },
+  { key: "ctr", label: "CTR", format: (t) => `${t.ctr.toFixed(2)}%` },
+  { key: "cpc", label: "CPC", format: (t) => fmtMoney(t.cpc) },
+  { key: "cpm", label: "CPM", format: (t) => fmtMoney(t.cpm) },
+];
+const DEFAULT_METRICS: MetricKey[] = ["spend", "impressions", "link_clicks", "ctr"];
+const LS_METRICS_KEY = "apd-meta-kpis";
+const LS_PRESETS_KEY = "apd-meta-kpi-presets";
 
 const PERIOD_LABELS: Record<Period["type"], string> = {
   today: "hoje", this_month: "mês atual", last_month: "mês anterior",
@@ -229,6 +247,134 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+function CloseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 6 6 18" /><path d="M6 6l12 12" />
+    </svg>
+  );
+}
+
+// Menu de escolha de métrica — só oferece as que ainda não estão em uso em
+// outro card (evita duplicar a mesma métrica duas vezes na fileira).
+function MetricPicker({ options, onPick, onClose }: { options: typeof METRIC_CATALOG; onPick: (k: MetricKey) => void; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-10" onClick={onClose} />
+      <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border border-brand-border bg-brand-surface shadow-card">
+        {options.map((m) => (
+          <button
+            key={m.key}
+            onClick={() => { onPick(m.key); onClose(); }}
+            className="block w-full px-3 py-2 text-left text-xs text-brand-text transition-colors hover:bg-brand-surface2"
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Card de KPI editável: lápis troca a métrica exibida, × remove o card.
+function EditableKpi({
+  metricKey, totals, usedKeys, onChange, onRemove, canRemove, open, onToggle,
+}: {
+  metricKey: MetricKey; totals: InsightsResponse["totals"]; usedKeys: MetricKey[];
+  onChange: (k: MetricKey) => void; onRemove: () => void; canRemove: boolean;
+  open: boolean; onToggle: () => void;
+}) {
+  const def = METRIC_CATALOG.find((m) => m.key === metricKey)!;
+  const options = METRIC_CATALOG.filter((m) => m.key === metricKey || !usedKeys.includes(m.key));
+  return (
+    <div className="relative rounded-xl border border-brand-border bg-brand-surface p-4">
+      <div className="mb-2 flex items-center justify-between gap-1">
+        <span className="text-[11px] uppercase tracking-wide text-brand-muted">{def.label}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          <button onClick={onToggle} title="Trocar métrica" className="rounded p-0.5 text-brand-muted transition-colors hover:text-brand-accent">
+            <PencilIcon />
+          </button>
+          {canRemove && (
+            <button onClick={onRemove} title="Remover" className="rounded p-0.5 text-brand-muted transition-colors hover:text-brand-danger">
+              <CloseIcon />
+            </button>
+          )}
+        </span>
+      </div>
+      <div className="text-2xl font-bold tabular-nums text-brand-text">{def.format(totals)}</div>
+      {open && <MetricPicker options={options} onPick={onChange} onClose={onToggle} />}
+    </div>
+  );
+}
+
+// Card de "adicionar", do mesmo tamanho dos outros — mantém a fileira simétrica.
+function AddMetricCard({ usedKeys, open, onToggle, onPick }: { usedKeys: MetricKey[]; open: boolean; onToggle: () => void; onPick: (k: MetricKey) => void }) {
+  const available = METRIC_CATALOG.filter((m) => !usedKeys.includes(m.key));
+  return (
+    <div className="relative flex items-center justify-center rounded-xl border border-dashed border-brand-border p-4">
+      <button
+        onClick={onToggle}
+        disabled={available.length === 0}
+        className="text-xs font-medium text-brand-muted transition-colors hover:text-brand-accent disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        + Adicionar métrica
+      </button>
+      {open && available.length > 0 && <MetricPicker options={available} onPick={onPick} onClose={onToggle} />}
+    </div>
+  );
+}
+
+// Barra de predefinições: salvar a combinação atual com um nome, carregar ou excluir uma salva.
+function PresetBar({ presets, onLoad, onSave, onDelete }: {
+  presets: MetricPreset[]; onLoad: (p: MetricPreset) => void; onSave: (name: string) => void; onDelete: (id: string) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const confirm = () => {
+    if (name.trim()) onSave(name.trim());
+    setName("");
+    setSaving(false);
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-brand-muted">Predefinições</span>
+      {presets.map((p) => (
+        <span key={p.id} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-border px-2 py-1 text-xs text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-text">
+          <button onClick={() => onLoad(p)}>{p.name}</button>
+          <button onClick={() => onDelete(p.id)} title="Excluir predefinição" className="text-brand-muted/60 hover:text-brand-danger">
+            <CloseIcon />
+          </button>
+        </span>
+      ))}
+      {saving ? (
+        <span className="flex items-center gap-1.5">
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome da predefinição"
+            onKeyDown={(e) => { if (e.key === "Enter") confirm(); if (e.key === "Escape") setSaving(false); }}
+            className="rounded-lg border border-brand-border bg-brand-surface px-2 py-1 text-xs text-brand-text focus:border-brand-accent focus:outline-none"
+          />
+          <button onClick={confirm} className="rounded-lg bg-brand-accent px-2 py-1 text-xs font-medium text-white">Salvar</button>
+          <button onClick={() => setSaving(false)} className="text-xs text-brand-muted hover:text-brand-text">Cancelar</button>
+        </span>
+      ) : (
+        <button onClick={() => setSaving(true)} className="rounded-lg border border-dashed border-brand-border px-2 py-1 text-xs text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-text">
+          + Salvar atual
+        </button>
+      )}
+    </div>
+  );
+}
+
 function StatusDot({ status }: { status: string }) {
   const active = status === "active";
   return (
@@ -347,6 +493,52 @@ export default function Dashboard() {
   const [google, setGoogle] = useState<GoogleAdsResponse | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Editor de métricas do Meta Ads — só neste navegador (localStorage).
+  const [metricKeys, setMetricKeys] = useState<MetricKey[]>(DEFAULT_METRICS);
+  const [presets, setPresets] = useState<MetricPreset[]>([]);
+  const [openPicker, setOpenPicker] = useState<number | "add" | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    try {
+      const savedMetrics = localStorage.getItem(LS_METRICS_KEY);
+      if (savedMetrics) {
+        const parsed = JSON.parse(savedMetrics) as string[];
+        const valid = parsed.filter((k): k is MetricKey => METRIC_CATALOG.some((m) => m.key === k));
+        if (valid.length > 0) setMetricKeys(valid);
+      }
+      const savedPresets = localStorage.getItem(LS_PRESETS_KEY);
+      if (savedPresets) setPresets(JSON.parse(savedPresets));
+    } catch {
+      // localStorage indisponível (modo privado, etc.) — segue com os padrões.
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(LS_METRICS_KEY, JSON.stringify(metricKeys));
+  }, [metricKeys, hydrated]);
+
+  const changeMetric = (index: number, key: MetricKey) => setMetricKeys((prev) => prev.map((k, i) => (i === index ? key : k)));
+  const removeMetric = (index: number) => setMetricKeys((prev) => prev.filter((_, i) => i !== index));
+  const addMetric = (key: MetricKey) => setMetricKeys((prev) => [...prev, key]);
+  const loadPreset = (p: MetricPreset) => setMetricKeys(p.metrics);
+  const savePreset = (name: string) => {
+    setPresets((prev) => {
+      const next = [...prev, { id: `${Date.now()}`, name, metrics: metricKeys }];
+      localStorage.setItem(LS_PRESETS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+  const deletePreset = (id: string) => {
+    setPresets((prev) => {
+      const next = prev.filter((p) => p.id !== id);
+      localStorage.setItem(LS_PRESETS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -499,11 +691,28 @@ export default function Dashboard() {
 
           {view === "meta" && (
             <div className="space-y-4">
+              <PresetBar presets={presets} onLoad={loadPreset} onSave={savePreset} onDelete={deletePreset} />
+
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Kpi label="Investimento" value={fmtMoney(insights?.totals.spend ?? 0)} />
-                <Kpi label="Impressões" value={fmtNum(insights?.totals.impressions ?? 0)} />
-                <Kpi label="Cliques no link" value={fmtNum(insights?.totals.link_clicks ?? 0)} />
-                <Kpi label="CTR" value={`${(insights?.totals.ctr ?? 0).toFixed(2)}%`} />
+                {metricKeys.map((key, i) => (
+                  <EditableKpi
+                    key={key}
+                    metricKey={key}
+                    totals={insights?.totals ?? EMPTY_TOTALS}
+                    usedKeys={metricKeys}
+                    onChange={(k) => changeMetric(i, k)}
+                    onRemove={() => removeMetric(i)}
+                    canRemove={metricKeys.length > 1}
+                    open={openPicker === i}
+                    onToggle={() => setOpenPicker(openPicker === i ? null : i)}
+                  />
+                ))}
+                <AddMetricCard
+                  usedKeys={metricKeys}
+                  open={openPicker === "add"}
+                  onToggle={() => setOpenPicker(openPicker === "add" ? null : "add")}
+                  onPick={addMetric}
+                />
               </div>
 
               <Panel title="Investimento diário">
