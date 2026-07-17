@@ -38,6 +38,15 @@ export async function logSync(
     .run();
 }
 
+// Timestamp do sync bem-sucedido mais recente, entre Meta e LiderHub (as
+// fontes que de fato rodam hoje — Google Ads fica de fora enquanto pendente).
+export async function lastSyncAny(db: D1DB): Promise<number | null> {
+  const row = await db
+    .prepare(`SELECT MAX(finished_at) AS t FROM sync_log WHERE source IN ('meta', 'liderhub') AND status = 'ok'`)
+    .first<{ t: number | null }>();
+  return row?.t ?? null;
+}
+
 export async function lastSync(db: D1DB, source: string): Promise<number | null> {
   const row = await db
     .prepare(`SELECT MAX(finished_at) AS t FROM sync_log WHERE source = ? AND status = 'ok'`)

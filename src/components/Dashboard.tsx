@@ -52,6 +52,8 @@ const fmtMoney = (v: number) => brl.format(Number.isFinite(v) ? v : 0);
 const fmtNum = (v: number) => numFmt.format(Number.isFinite(v) ? Math.round(v) : 0);
 const fmtDateBR = (iso: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return m ? `${m[3]}/${m[2]}/${m[1]}` : iso; };
 const fmtDayMonth = (iso: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); return m ? `${m[3]}/${m[2]}` : iso; };
+const syncTimeFmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const fmtSyncTime = (unixSeconds: number) => syncTimeFmt.format(new Date(unixSeconds * 1000)).replace(",", " às");
 
 const PERIOD_LABELS: Record<Period["type"], string> = {
   today: "hoje", this_month: "mês atual", last_month: "mês anterior",
@@ -343,20 +345,23 @@ export default function Dashboard() {
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [leads, setLeads] = useState<LeadsResponse | null>(null);
   const [google, setGoogle] = useState<GoogleAdsResponse | null>(null);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const qs = periodQuery(period);
-      const [i, l, g] = await Promise.all([
+      const [i, l, g, s] = await Promise.all([
         fetch(`/api/insights?${qs}`, { cache: "no-store" }).then((r) => r.json()),
         fetch(`/api/leads?${qs}`, { cache: "no-store" }).then((r) => r.json()),
         fetch(`/api/googleads?${qs}`, { cache: "no-store" }).then((r) => r.json()),
+        fetch(`/api/status`, { cache: "no-store" }).then((r) => r.json()),
       ]);
       setInsights(i);
       setLeads(l);
       setGoogle(g);
+      setLastSyncedAt(s?.lastSyncedAt ?? null);
     } finally {
       setLoading(false);
     }
@@ -412,11 +417,11 @@ export default function Dashboard() {
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <h1 className="font-serif text-lg font-semibold text-brand-text">{NAV.find((n) => n.key === view)?.label}</h1>
-              <p className="text-xs text-brand-muted">{PERIOD_LABELS[period.type]}{loading ? " · atualizando…" : ""}</p>
+              <p className="text-xs text-brand-muted">{PERIOD_LABELS[period.type]}{loading ? " · carregando…" : ""}</p>
             </div>
-            <button onClick={load} className="rounded-lg border border-brand-border px-3 py-1.5 text-xs text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-text">
-              Atualizar
-            </button>
+            <p className="text-[11px] text-brand-muted">
+              {lastSyncedAt ? <>Dados atualizados em {fmtSyncTime(lastSyncedAt)}</> : loading ? "" : "Ainda sem sincronização registrada"}
+            </p>
           </div>
         </header>
 
